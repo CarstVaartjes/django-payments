@@ -39,7 +39,6 @@ def process_data(request, token, provider=None):
 @csrf_exempt
 @atomic
 def static_callback(request, variant):
-
     try:
         provider = provider_factory(variant)
     except ValueError:
@@ -51,9 +50,35 @@ def static_callback(request, variant):
     return process_data(request, token, provider)
 
 
+import stripe
+import json
+
+@csrf_exempt
+def stripe_source_callback(request):
+    """
+    we get a callback after the end of the payment, so that we can try to charge if it was successful
+    
+    :param request: 
+    :return: 
+    """
+    provider = provider_factory('stripe_sources')
+    stripe.api_key = provider.secret_key
+    # Retrieve the request's body and parse it as JSON
+    event_json = json.loads(request.body)
+    # Verify the event by fetching it from Stripe
+    event = stripe.Event.retrieve(event_json["id"])
+    # Now retrieve the payment
+    payment_id = event.data.object.id
+    # now charge
+    pass
+
+
 urlpatterns = [
     url(r'^process/(?P<token>[0-9a-z]{8}-[0-9a-z]{4}-'
         '[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{12})/$', process_data,
         name='process_payment'),
     url(r'^process/(?P<variant>[a-z-]+)/$', static_callback,
-        name='static_process_payment')]
+        name='static_process_payment'),
+    url(r'^stripe_source/$', stripe_source_callback,
+        name='stripe_source'),
+]
